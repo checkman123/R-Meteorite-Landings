@@ -83,6 +83,9 @@ ggplot() +
 
 ## Data Wrangling
 ```{r }
+Meteorite_count_by_year <- Meteorite_count_by_year %>% 
+  mutate(year = factor(year, Meteorite_count_by_year$year[order(Meteorite_count_by_year$n, decreasing = TRUE)]))
+
 #Top 20 meteorite counts by year
 Meteorite_count_by_year <-Meteorite_location %>% 
   count(year) %>% 
@@ -104,20 +107,6 @@ Meteorite_mass_by_year <- Meteorite_location %>% filter(!is.na(`mass (g)`)) %>%
   head(20)
 ```
 
-```{r}
-Meteorite_count_by_year %>% 
-  mutate(year = factor(year, Meteorite_count_by_year$year[order(Meteorite_count_by_year$n, decreasing = TRUE)])) %>%
-
-ggplot(aes(x=factor(year), y=n)) + 
-  geom_bar(stat="identity", width=.5, fill="steelblue") +
-  labs(x="Year",
-       y="Counts",
-       title="Top 20 Meteorite Counts by Year") +
-  theme(plot.title = element_text(hjust = 0.5),
-        axis.title.y=element_blank(),
-        axis.title.x=element_blank()) +
-  geom_text(aes(label=n), vjust=-0.75,size=3)
-```
 ```{r warning=FALSE}
 Meteorite_by_mass %>% 
   mutate(name = factor(name, Meteorite_by_mass$name[order(Meteorite_by_mass$`mass (g)`)])) %>%
@@ -169,6 +158,20 @@ ggplot(Meteorite_count, aes(x="", y=prop, fill=fall)) +
 ```
 
 ## Meteorite Count by Year
+```{r}
+Meteorite_count_by_year
+
+ggplot(Meteorite_count_by_year, aes(x=factor(year), y=n)) + 
+  geom_bar(stat="identity", width=.5, fill="steelblue") +
+  labs(x="Year",
+       y="Counts",
+       title="Top 20 Meteorite Counts by Year") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank()) +
+  geom_text(aes(label=n), vjust=-0.75,size=3)
+```
+
 ```{r warning=FALSE}
 ggplot(data = Meteorite_location,mapping = aes(x=year, fill=fall)) +
   geom_histogram(binwidth = 1)
