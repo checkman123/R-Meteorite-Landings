@@ -6,7 +6,7 @@ output: openintro::lab_report
 ---
 
 ---
-title: "Metorite Landing"
+title: "Meteorite Landing"
 output: html_document
 date: "2022-10-25"
 ---
@@ -19,6 +19,9 @@ library(plotly)
 library(readr)
 library(dplyr)
 library(scales)
+library(sp)
+library(rworldmap)
+library(usmap)
 
 ```
 
@@ -27,9 +30,13 @@ library(scales)
 #Set world map
 world <- map_data("world")
 
+#Set US map
+states <- map_data("state")
+
 #Read in Meteorite data
 Meteorite_Landings <- read_csv("Meteorite_Landings.csv")
 ```
+
 ## Filter/Sort Data
 ```{r}
 #remove rows that doesnt have long and lat values
@@ -58,7 +65,7 @@ ggplot() +
   theme_void()
 
 #filter lat and long
-data_filtered <- Meteorite_location %>% filter(reclong > -180, reclong < 180, reclat > -80, reclat < 80)
+data_filtered <- Meteorite_location %>% filter(reclong > -180 & reclong < 180 & reclat > -80 & reclat < 80)
 
 ggplot() +
   geom_map(
@@ -76,25 +83,72 @@ ggplot() +
 
 ## Data Wrangling
 ```{r }
-#Top 20 of meteorite landings by year
-Meteorite_by_year <-Meteorite_location %>% count(year) %>% arrange(desc(n)) %>% head(20)
+#Top 20 meteorite counts by year
+Meteorite_count_by_year <-Meteorite_location %>% 
+  count(year) %>% 
+  arrange(desc(n)) %>% 
+  head(20)
 
-#Sort Meteorite by mass
+#Top 20 Meteorite by mass
 Meteorite_by_mass <- Meteorite_location %>% filter(!is.na(`mass (g)`)) %>% 
   select(name,year,`mass (g)`) %>% 
   group_by(year) %>% 
-  slice(1:1) %>% arrange(desc(`mass (g)`)) 
+  slice(1:1) %>% arrange(desc(`mass (g)`)) %>% 
+  head(20)
 
-#Sort Meteorite by year
+#Heaviest Meteorite by year
 Meteorite_mass_by_year <- Meteorite_location %>% filter(!is.na(`mass (g)`)) %>% 
   select(name,year,`mass (g)`) %>% 
   group_by(year) %>% 
-  slice(1:1) %>% arrange(desc(year)) 
-
-Meteorite_by_year
-Meteorite_by_mass
-Meteorite_mass_by_year
+  slice(1:1) %>% arrange(desc(year)) %>% 
+  head(20)
 ```
+
+```{r}
+Meteorite_count_by_year %>% 
+  mutate(year = factor(year, Meteorite_count_by_year$year[order(Meteorite_count_by_year$n, decreasing = TRUE)])) %>%
+
+ggplot(aes(x=factor(year), y=n)) + 
+  geom_bar(stat="identity", width=.5, fill="steelblue") +
+  labs(x="Year",
+       y="Counts",
+       title="Top 20 Meteorite Counts by Year") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank()) +
+  geom_text(aes(label=n), vjust=-0.75,size=3)
+```
+```{r warning=FALSE}
+Meteorite_by_mass %>% 
+  mutate(name = factor(name, Meteorite_by_mass$name[order(Meteorite_by_mass$`mass (g)`)])) %>%
+
+  ggplot(aes(x=`mass (g)`,y=name )) +
+              geom_bar(stat='identity', fill="steelblue") + 
+  scale_x_continuous(labels = comma) +
+  geom_text(aes(label=scales::comma(`mass (g)`)), hjust=-0.4, colour = "black", position = "dodge", hjust="inward") +
+  labs(y="Meteorite Names", x="Mass (g)",
+       title = "Top 20 Heaviest Meteorites") +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+```{r warning=FALSE}
+Meteorite_mass_by_year %>% 
+
+  ggplot(aes(x=factor(year),y= `mass (g)`)) +
+              geom_bar(stat='identity', fill="steelblue") +
+  geom_text(aes(label=name), hjust=0, colour = "black") +
+  labs(y="Mass (g)", x="Year",
+       title = "Heaviest Meteorite from 1994 to 2013") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.5)) + 
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  expand_limits(x = 0, y = 150000)
+```
+
+
+
+
 ```{r warning=FALSE}
 Meteorite_count <- Meteorite_location %>% count(fall)
 
@@ -114,6 +168,7 @@ ggplot(Meteorite_count, aes(x="", y=prop, fill=fall)) +
   scale_fill_brewer(palette="Set1")
 ```
 
+## Meteorite Count by Year
 ```{r warning=FALSE}
 ggplot(data = Meteorite_location,mapping = aes(x=year, fill=fall)) +
   geom_histogram(binwidth = 1)
@@ -123,9 +178,98 @@ Meteorite_1800 <- filter(Meteorite_location, year > 1800, year < 2100)
 ggplot(data = Meteorite_1800,mapping = aes(x=year, fill=fall)) +
   geom_histogram(binwidth = 1)
 ```
+
 ```{r}
+#From https://stackoverflow.com/questions/14334970/convert-latitude-and-longitude-coordinates-to-country-name-in-r
+# The single argument to this function, points, is a data.frame in which:
+#   - column 1 contains the longitude in degrees
+#   - column 2 contains the latitude in degrees
+coords2country = function(points)
+{  
+  countriesSP <- getMap(resolution='low')
+  #countriesSP <- getMap(resolution='high') #you could use high res map from rworldxtra if you were concerned about detail
+
+  # convert our list of points to a SpatialPoints object
+
+  # pointsSP = SpatialPoints(points, proj4string=CRS(" +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs +towgs84=0,0,0"))
+
+  #setting CRS directly to that from rworldmap
+  pointsSP = SpatialPoints(points, proj4string=CRS(proj4string(countriesSP)))  
+
+
+  # use 'over' to get indices of the Polygons object containing each point 
+  indices = over(pointsSP, countriesSP)
+
+  # return the ADMIN names of each country
+  indices$ADMIN  
+  #indices$ISO3 # returns the ISO3 code 
+  #indices$continent   # returns the continent (6 continent model)
+  #indices$REGION   # returns the continent (7 continent model)
+}
+```
+
+## Meteorite Landings in USA
+```{r warning=FALSE}
+#Add country to the data based on the long,lat coordinates
+Meteorite_Landings <- Meteorite_Landings %>%
+  mutate(Country = coords2country(data.frame(reclong, reclat)))
+
+#filtered to only US
+Meteorite_Landings_US <- Meteorite_Landings %>% 
+  filter(Country == "United States of America")
+
+#transform data to use in plot_usmap
+transform_to_map <- Meteorite_Landings_US %>% select(lon = reclong,lat = reclat, fall) %>% usmap_transform()
 
 ```
+
+```{r }
+plot_usmap(regions ="state") + 
+  geom_point(
+    data = transform_to_map,
+    aes(x, y, color=fall),
+    alpha = 0.4
+  )
+```
+
+
+```{r warning=FALSE}
+Meteorite_count_US <- Meteorite_Landings_US %>% count(fall)
+
+Meteorite_count_US %>% mutate(total = sum(n))
+
+Meteorite_count_US <- Meteorite_count_US %>% 
+  arrange(desc(fall)) %>%
+  mutate(prop = n / sum(n) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop ) %>%
+  mutate(percent = prop/100)
+
+ggplot(Meteorite_count_US, aes(x="", y=prop, fill=fall)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  geom_text(aes(y = ypos, label = label_percent()(percent)), color = "white", size=6) +
+  scale_fill_brewer(palette="Set1")
+```
+
+```{r warning=FALSE}
+Meteorite_Landings_US %>% arrange(desc(`mass (g)`)) %>%
+  head(15) %>% 
+  mutate(name = factor(name, Meteorite_Landings_US$name[order(Meteorite_Landings_US$`mass (g)`)])) %>%
+
+ggplot(aes(x=`mass (g)`,y=name ))+
+              geom_bar(stat='identity', fill="steelblue") + 
+  scale_x_continuous(labels = comma) +
+  geom_text(aes(label=scales::comma(`mass (g)`)), hjust=-0.4, colour = "black", position = "dodge", hjust="inward") +
+  labs(y="Meteorite Names", x="Mass (g)",
+       title = "Top 15 Heaviest Meteorites in USA") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+```
+
+
+
+
 
 
 
