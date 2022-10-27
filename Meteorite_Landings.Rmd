@@ -1,0 +1,131 @@
+---
+title: "Meteorite Landings"
+author: "Sanyapoom Sirijirakarn"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+---
+title: "Metorite Landing"
+output: html_document
+date: "2022-10-25"
+---
+
+```{r setup, include=FALSE}
+	
+library(tidyverse)
+library(openintro)
+library(plotly)
+library(readr)
+library(dplyr)
+library(scales)
+
+```
+
+## Prep data
+```{r}
+#Set world map
+world <- map_data("world")
+
+#Read in Meteorite data
+Meteorite_Landings <- read_csv("Meteorite_Landings.csv")
+```
+## Filter/Sort Data
+```{r}
+#remove rows that doesnt have long and lat values
+Meteorite_Landings <-  filter(Meteorite_Landings, !is.na(reclat), !is.na(reclong))
+
+#Read in Meteorite data sort by year
+Meteorite_location <- Meteorite_Landings %>%
+  select(year,reclat,reclong,fall,recclass,name, `mass (g)`) %>% filter(year < 2022) %>% arrange(year) 
+
+Meteorite_location
+```
+
+## World Map of Meteorite Landings
+```{r warning=FALSE, fig.align="center", echo = FALSE,fig.width = 10}
+ggplot() +
+  geom_map(
+    data = world, map = world,
+    aes(long, lat, map_id = region),
+    color = "black", fill = "lightgray", size = 0.1
+  ) + 
+  geom_point(
+    data = Meteorite_location,
+    aes(reclong, reclat, color=fall),
+    alpha = 0.2
+  ) +
+  theme_void()
+
+#filter lat and long
+data_filtered <- Meteorite_location %>% filter(reclong > -180, reclong < 180, reclat > -80, reclat < 80)
+
+ggplot() +
+  geom_map(
+    data = world, map = world,
+    aes(long, lat, map_id = region),
+    color = "black", fill = "lightgray", size = 0.1
+  ) + 
+  geom_point(
+    data = data_filtered,
+    aes(reclong, reclat, color=fall),
+    alpha = 0.2
+  ) +
+  theme_void()
+```
+
+## Data Wrangling
+```{r }
+#Top 20 of meteorite landings by year
+Meteorite_by_year <-Meteorite_location %>% count(year) %>% arrange(desc(n)) %>% head(20)
+
+#Sort Meteorite by mass
+Meteorite_by_mass <- Meteorite_location %>% filter(!is.na(`mass (g)`)) %>% 
+  select(name,year,`mass (g)`) %>% 
+  group_by(year) %>% 
+  slice(1:1) %>% arrange(desc(`mass (g)`)) 
+
+#Sort Meteorite by year
+Meteorite_mass_by_year <- Meteorite_location %>% filter(!is.na(`mass (g)`)) %>% 
+  select(name,year,`mass (g)`) %>% 
+  group_by(year) %>% 
+  slice(1:1) %>% arrange(desc(year)) 
+
+Meteorite_by_year
+Meteorite_by_mass
+Meteorite_mass_by_year
+```
+```{r warning=FALSE}
+Meteorite_count <- Meteorite_location %>% count(fall)
+
+Meteorite_count %>% mutate(total = sum(n))
+
+Meteorite_count <- Meteorite_count %>% 
+  arrange(desc(fall)) %>%
+  mutate(prop = n / sum(n) *100) %>%
+  mutate(ypos = cumsum(prop)- 0.5*prop ) %>%
+  mutate(percent = prop/100)
+
+ggplot(Meteorite_count, aes(x="", y=prop, fill=fall)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void() +
+  geom_text(aes(y = ypos, label = label_percent()(percent)), color = "white", size=6) +
+  scale_fill_brewer(palette="Set1")
+```
+
+```{r warning=FALSE}
+ggplot(data = Meteorite_location,mapping = aes(x=year, fill=fall)) +
+  geom_histogram(binwidth = 1)
+```
+```{r}
+Meteorite_1800 <- filter(Meteorite_location, year > 1800, year < 2100)
+ggplot(data = Meteorite_1800,mapping = aes(x=year, fill=fall)) +
+  geom_histogram(binwidth = 1)
+```
+```{r}
+
+```
+
+
+
